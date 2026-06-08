@@ -21,15 +21,35 @@ jobs:
           flutter-version: "3.35.2"
           channel: stable
 
-      - name: Disable release signing for debug build
+      - name: Strip release signing block (debug build only)
         run: |
-          sed -i 's|signingConfig signingConfigs.release||g' android/app/build.gradle
+          python3 - <<'PY'
+          import re, pathlib
+          p = pathlib.Path("android/app/build.gradle")
+          src = p.read_text()
+          src = re.sub(r"signingConfigs\s*\{[^}]*\}\s*", "", src, flags=re.S)
+          src = re.sub(r"signingConfig\s+signingConfigs\.\w+", "", src)
+          p.write_text(src)
+          PY
+
+      - name: Create .env file
+        run: |
+          cat > .env <<ENV
+          LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}
+          LASTFM_API_SECRET=${{ secrets.LASTFM_API_SECRET }}
+          HIDE_DONATIONS=0
+          ENABLE_UPDATE_CHECK=0
+          RELEASE_CHANNEL=stable
+          ENV
 
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build APK
-        run: flutter build apk --debug --flavor stable --split-per-abi
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build debug APK (arm64 only)
+        run: flutter build apk --debug --flavor stable --target-platform android-arm64
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
