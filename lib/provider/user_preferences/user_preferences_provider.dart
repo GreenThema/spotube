@@ -67,7 +67,7 @@ class UserPreferencesNotifier extends Notifier<PreferencesTableData> {
   }
 
   Future<String> _getDefaultDownloadDirectory() async {
-    if (kIsAndroid) return "/storage/emulated/0/Download/Spotube";
+    if (kIsAndroid) return "/storage/emulated/0/Music/Spotube";
 
     if (kIsMacOS) {
       return join((await paths.getLibraryDirectory()).path, "Caches");

@@ -14,21 +14,36 @@ void useGetStoragePermissions(WidgetRef ref) {
     () async {
       if (kIsAndroid) {
         final androidInfo = await DeviceInfoPlugin().androidInfo;
+        final sdkInt = androidInfo.version.sdkInt;
 
-        final hasNoStoragePerm = androidInfo.version.sdkInt < 33 &&
-            !await Permission.storage.isGranted &&
-            !await Permission.storage.isLimited;
+        if (sdkInt < 33) {
+          final hasNoStoragePerm = !await Permission.storage.isGranted &&
+              !await Permission.storage.isLimited;
+          if (hasNoStoragePerm) {
+            await Permission.storage.request();
+            if (context.mounted) ref.invalidate(localTracksProvider);
+          }
+        } else {
+          final hasNoAudioPerm = !await Permission.audio.isGranted &&
+              !await Permission.audio.isLimited;
+          if (hasNoAudioPerm) {
+            await Permission.audio.request();
+            if (context.mounted) ref.invalidate(localTracksProvider);
+          }
 
-        final hasNoAudioPerm = androidInfo.version.sdkInt >= 33 &&
-            !await Permission.audio.isGranted &&
-            !await Permission.audio.isLimited;
-
-        if (hasNoStoragePerm) {
-          await Permission.storage.request();
-          if (context.mounted) ref.invalidate(localTracksProvider);
+          if (!await Permission.notification.isGranted) {
+            await Permission.notification.request();
+          }
         }
-        if (hasNoAudioPerm) {
-          await Permission.audio.request();
+
+        // On Android 11+ direct filesystem access to user-picked folders
+        // (e.g. /storage/emulated/0/Music) requires MANAGE_EXTERNAL_STORAGE
+        // unless the app routes through MediaStore/SAF. Music players are
+        // eligible for this permission and it lets Spotube enumerate the
+        // user's library regardless of where they keep it.
+        if (sdkInt >= 30 &&
+            !await Permission.manageExternalStorage.isGranted) {
+          await Permission.manageExternalStorage.request();
           if (context.mounted) ref.invalidate(localTracksProvider);
         }
       }

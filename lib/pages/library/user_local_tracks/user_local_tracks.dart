@@ -58,13 +58,16 @@ class UserLocalLibraryPage extends HookConsumerWidget {
 
     // This is just to pre-load the tracks.
     // For now, this gets all of them.
-    ref.watch(localTracksProvider);
+    final tracksByFolder = ref.watch(localTracksProvider);
 
-    final locations = [
+    final locations = {
       preferences.downloadLocation,
       if (cacheDir.hasData) cacheDir.data!,
       ...preferences.localLibraryLocation,
-    ];
+      // Include any implicit folders (e.g. Android's Music/Download) that the
+      // provider auto-scans, so they show up as cards in the UI too.
+      ...?tracksByFolder.asData?.value.keys,
+    }.where((e) => e.isNotEmpty).toList();
 
     return LayoutBuilder(
         builder: (context, constrains) => Padding(

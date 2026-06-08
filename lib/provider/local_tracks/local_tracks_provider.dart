@@ -13,7 +13,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:spotube/provider/user_preferences/user_preferences_provider.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_rust_bridge/flutter_rust_bridge.dart' show FrbException;
+import 'package:spotube/utils/platform.dart';
 import 'package:spotube/utils/service_utils.dart';
+
+const _androidDefaultMusicDirs = <String>[
+  "/storage/emulated/0/Music",
+  "/storage/emulated/0/Download",
+];
 
 const supportedAudioTypes = [
   "audio/webm",
@@ -58,21 +64,38 @@ final localTracksProvider =
     final downloadDir = Directory(downloadLocation);
     final cacheDir =
         Directory(await UserPreferencesNotifier.getMusicCacheDir());
-    if (!await downloadDir.exists()) {
-      await downloadDir.create(recursive: true);
+    try {
+      if (!await downloadDir.exists()) {
+        await downloadDir.create(recursive: true);
+      }
+    } catch (e, stack) {
+      AppLogger.reportError(e, stack);
     }
-    if (!await cacheDir.exists()) {
-      await cacheDir.create(recursive: true);
+    try {
+      if (!await cacheDir.exists()) {
+        await cacheDir.create(recursive: true);
+      }
+    } catch (e, stack) {
+      AppLogger.reportError(e, stack);
     }
     final localLibraryLocations = ref.watch(
       userPreferencesProvider.select((s) => s.localLibraryLocation),
     );
 
-    for (final location in [
+    // Auto-include common music folders on Android so users don't have to
+    // manually add them. Duplicates are filtered out below.
+    final implicitLocations = <String>[
+      if (kIsAndroid) ..._androidDefaultMusicDirs,
+    ];
+
+    final scanLocations = <String>{
       downloadLocation,
       cacheDir.path,
-      ...localLibraryLocations
-    ]) {
+      ...localLibraryLocations,
+      ...implicitLocations,
+    }.where((e) => e.isNotEmpty).toList();
+
+    for (final location in scanLocations) {
       if (location.isEmpty) continue;
       final entities = <File>[];
       if (await Directory(location).exists()) {
@@ -137,6 +160,12 @@ final localTracksProvider =
             ) as SpotubeLocalTrackObject,
           )
           .toList();
+
+      // Don't surface implicit Android folders unless they actually contain
+      // music — avoids showing empty "Music"/"Download" cards on devices
+      // where those folders are unused.
+      final isImplicit = implicitLocations.contains(location);
+      if (isImplicit && tracksFromMetadata.isEmpty) continue;
 
       libraryToTracks[location] = tracksFromMetadata;
     }
