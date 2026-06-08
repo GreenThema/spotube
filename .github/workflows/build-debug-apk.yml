@@ -1,0 +1,39 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches: [claude/pensive-bell-19kID]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+
+      - name: Disable release signing for debug build
+        run: |
+          sed -i 's|signingConfig signingConfigs.release||g' android/app/build.gradle
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --debug --flavor stable --split-per-abi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotube-android-apks
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 14
